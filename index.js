@@ -79,9 +79,10 @@ client.on("clientReady", () => {
 // عند تغيير القناة
 client.on("channelUpdate", async (oldCh, newCh) => {
   try {
-    // تأكد أن البوت يمتلك الصلاحيات
-    if (!newCh.guild.me.permissions.has("MANAGE_CHANNELS")) {
-      return console.error("البوت لا يمتلك صلاحية إدارة القنوات.");
+    // التأكد من وجود القناة (وأن البوت يمتلك الصلاحيات)
+    if (!newCh || !newCh.guild.me.permissions.has("MANAGE_CHANNELS")) {
+      console.error("البوت لا يمتلك صلاحية إدارة القنوات أو القناة غير موجودة.");
+      return;
     }
 
     const logs = await newCh.guild.fetchAuditLogs({
