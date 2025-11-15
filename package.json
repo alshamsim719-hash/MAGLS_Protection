@@ -1,0 +1,16 @@
+
+{
+  "name": "magls_protection",
+  "version": "1.0.0",
+  "description": "MAGLS_Protection - Discord server protection bot",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "author": "MAGLS ALSHAMSI",
+  "license": "MIT",
+  "dependencies": {
+    "discord.js": "^14.15.3",
+    "dotenv": "^16.4.5"
+  }
+}
