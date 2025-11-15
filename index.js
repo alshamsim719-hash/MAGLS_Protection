@@ -72,7 +72,7 @@ async function punishMember(guild, userId, reason = "حماية السيرفر")
 }
 
 // عند تشغيل البوت
-client.on("ready", () => {
+client.on("clientReady", () => {
   console.log(`✅ Logged in as ${client.user.tag}`);
 });
 
