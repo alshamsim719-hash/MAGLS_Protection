@@ -1,23 +1,28 @@
-// MAGLS_Protection - Fixed Version By Mansour 👑🔥
+// MAGLS Protection - Ultimate Owner Bypass Edition 👑🔥
+// By Mansour
 
 require("dotenv").config();
 const {
   Client,
   GatewayIntentBits,
-  Partials,
   AuditLogEvent,
-  PermissionsBitField
+  PermissionsBitField,
+  Partials
 } = require("discord.js");
 
 const TOKEN = process.env.TOKEN;
+
+// 👑 Owner ID
 const OWNER_ID = "1253251616765775882";
+
+// Logs channel name
 const LOGS_CHANNEL_NAME = "magls-logs";
 
-let whitelist = [OWNER_ID];
+// Storage
+let whitelist = []; // No need to add owner here manually (auto)
 const channelBackup = new Map();
 const guildSettings = new Map();
-
-const protectionState = new Map();
+const protectionState = new Map(); // TRUE = protection ON
 
 const client = new Client({
   intents: [
@@ -29,14 +34,14 @@ const client = new Client({
   partials: [Partials.Channel, Partials.GuildMember]
 });
 
-// ========== FUNCTIONS ==========
+// ======= UTILITIES =======
 
 function isOwner(id) {
   return id === OWNER_ID;
 }
 
 function isWhitelisted(id) {
-  return whitelist.includes(id);
+  return isOwner(id) || whitelist.includes(id);
 }
 
 function ensureProtection(guildId) {
@@ -45,34 +50,29 @@ function ensureProtection(guildId) {
 }
 
 async function ensureLogChannel(guild) {
-  let logChannel = guild.channels.cache.find(
-    ch => ch.name === LOGS_CHANNEL_NAME
-  );
-
-  if (!logChannel) {
+  let logCh = guild.channels.cache.find(ch => ch.name === LOGS_CHANNEL_NAME);
+  if (!logCh) {
     try {
-      logChannel = await guild.channels.create({
+      logCh = await guild.channels.create({
         name: LOGS_CHANNEL_NAME,
-        reason: "Log channel for MAGLS Protection"
+        reason: "MAGLS Protection Logs"
       });
-    } catch (err) {
-      console.log("Cannot create log channel:", err.message);
+    } catch {
       return null;
     }
   }
-
-  return logChannel;
+  return logCh;
 }
 
 async function logAction(guild, msg) {
-  try {
-    const ch = await ensureLogChannel(guild);
-    if (!ch) return;
-    ch.send(msg).catch(()=>{});
-  } catch {}
+  const ch = await ensureLogChannel(guild);
+  if (!ch) return;
+  ch.send(msg).catch(()=>{});
 }
 
 async function punishMember(guild, userId, reason) {
+  if (isOwner(userId)) return; // OWNER BYPASS FULL
+
   try {
     const member = guild.members.cache.get(userId);
     if (!member) return;
@@ -92,14 +92,20 @@ async function punishMember(guild, userId, reason) {
   } catch {}
 }
 
-// ========== READY EVENT ==========
+// ======= READY =======
 
 client.on("ready", () => {
   console.log(`✅ Logged in as ${client.user.tag}`);
 
+  // Auto Owner Whitelist
+  if (!whitelist.includes(OWNER_ID)) whitelist.push(OWNER_ID);
+
   client.guilds.cache.forEach(guild => {
-    guildSettings.set(guild.id, { name: guild.name });
     protectionState.set(guild.id, true);
+
+    guildSettings.set(guild.id, {
+      name: guild.name
+    });
 
     guild.channels.cache.forEach(ch => {
       channelBackup.set(ch.id, {
@@ -111,15 +117,15 @@ client.on("ready", () => {
   });
 });
 
-// ========== COMMANDS ==========
+// ======= COMMANDS =======
 
-client.on("messageCreate", async msg => {
+client.on("messageCreate", async (msg) => {
   if (!msg.guild || msg.author.bot) return;
 
   const args = msg.content.trim().split(/\s+/);
   const cmd = args.shift()?.toLowerCase();
 
-  // HELP
+  // help command
   if (cmd === "help") {
     return msg.reply(
       [
@@ -136,17 +142,16 @@ client.on("messageCreate", async msg => {
     );
   }
 
+  // Only owner can use advanced commands
   if (!isOwner(msg.author.id)) return;
 
   if (cmd === "protect") {
     const mode = args[0];
-    if (mode !== "on" && mode !== "off")
+    if (!["on", "off"].includes(mode))
       return msg.reply("استخدم: protect on / protect off");
 
     protectionState.set(msg.guild.id, mode === "on");
-    msg.reply(
-      mode === "on" ? "🔒 تم تشغيل الحماية" : "🔓 تم إيقاف الحماية"
-    );
+    msg.reply(mode === "on" ? "🔒 تم تشغيل الحماية" : "🔓 تم إيقاف الحماية");
     return;
   }
 
@@ -154,7 +159,7 @@ client.on("messageCreate", async msg => {
     const user = msg.mentions.users.first();
     if (!user) return msg.reply("استخدم: run @user");
 
-    if (isWhitelisted(user.id)) return msg.reply("هو أساسًا فوق الحماية");
+    if (isWhitelisted(user.id)) return msg.reply("هو بالفعل فوق الحماية");
 
     whitelist.push(user.id);
     msg.reply(`تم رفع **${user.tag}** فوق الحماية 👑`);
@@ -165,8 +170,8 @@ client.on("messageCreate", async msg => {
     const user = msg.mentions.users.first();
     if (!user) return msg.reply("استخدم: unrun @user");
 
-    if (user.id === OWNER_ID)
-      return msg.reply("❌ مستحيل أشيلك من الحماية. أنت المالك.");
+    if (isOwner(user.id))
+      return msg.reply("❌ لا يمكن إزالة المالك من الحماية");
 
     whitelist = whitelist.filter(id => id !== user.id);
     msg.reply(`تم إزالة **${user.tag}** من الحماية ❌`);
@@ -174,7 +179,6 @@ client.on("messageCreate", async msg => {
   }
 
   if (cmd === "whitelist") {
-    if (!whitelist.length) return msg.reply("قائمة الحماية فاضية.");
     return msg.reply(
       whitelist.map(id => `<@${id}>`).join("\n")
     );
@@ -182,26 +186,27 @@ client.on("messageCreate", async msg => {
 
   if (cmd === "logs") {
     const ch = await ensureLogChannel(msg.guild);
-    msg.reply(`قناة اللوق هي: ${ch}`);
+    msg.reply(`قناة اللوق: ${ch}`);
   }
 });
 
-// ========== PROTECTION SYSTEM ==========
+// ======= PROTECTIONS =======
 
-// حماية تعديل القنوات
+// Protect Channel Update
 client.on("channelUpdate", async (oldCh, newCh) => {
   try {
-    if (!ensureProtection(newCh.guild.id)) return;
+    const guild = newCh.guild;
+    if (!ensureProtection(guild.id)) return;
 
-    const logs = await newCh.guild.fetchAuditLogs({
+    const logs = await guild.fetchAuditLogs({
       limit: 1,
       type: AuditLogEvent.ChannelUpdate
     });
-
     const entry = logs.entries.first();
     if (!entry) return;
 
     const executor = entry.executor;
+
     if (isWhitelisted(executor.id)) return;
 
     const backup = channelBackup.get(newCh.id);
@@ -213,21 +218,21 @@ client.on("channelUpdate", async (oldCh, newCh) => {
       position: backup.position
     }).catch(()=>{});
 
-    await punishMember(newCh.guild, executor.id, "تعديل قناة بدون إذن");
-    await logAction(newCh.guild, `تم إرجاع قناة ${newCh} بعد محاولة تعديل.`);
+    await punishMember(guild, executor.id, "تعديل قناة بدون إذن");
+    await logAction(guild, `🔄 تم إرجاع قناة ${newCh}`);
   } catch {}
 });
 
-// حماية حذف القنوات
+// Protect Channel Delete
 client.on("channelDelete", async (channel) => {
   try {
-    if (!ensureProtection(channel.guild.id)) return;
+    const guild = channel.guild;
+    if (!ensureProtection(guild.id)) return;
 
-    const logs = await channel.guild.fetchAuditLogs({
+    const logs = await guild.fetchAuditLogs({
       limit: 1,
       type: AuditLogEvent.ChannelDelete
     });
-
     const entry = logs.entries.first();
     if (!entry) return;
 
@@ -237,79 +242,81 @@ client.on("channelDelete", async (channel) => {
     const data = channelBackup.get(channel.id);
     if (!data) return;
 
-    await channel.guild.channels.create({
+    await guild.channels.create({
       name: data.name,
       parent: data.parent,
       position: data.position
     }).catch(()=>{});
 
-    await punishMember(channel.guild, executor.id, "حذف قناة بدون إذن");
+    await punishMember(guild, executor.id, "حذف قناة بدون إذن");
+    await logAction(guild, `♻️ تم استرجاع القناة المحذوفة`);
   } catch {}
 });
 
-// حماية تعديل الرتب
+// Protect Role Changes
 client.on("guildMemberUpdate", async (oldM, newM) => {
   try {
-    if (!ensureProtection(newM.guild.id)) return;
+    const guild = newM.guild;
+    if (!ensureProtection(guild.id)) return;
 
-    const logs = await newM.guild.fetchAuditLogs({
+    const logs = await guild.fetchAuditLogs({
       limit: 1,
       type: AuditLogEvent.MemberRoleUpdate
     });
-
     const entry = logs.entries.first();
     if (!entry) return;
 
     const executor = entry.executor;
+
     if (isWhitelisted(executor.id)) return;
 
-    // سحب الرتب كاملة من المخالف
-    await punishMember(newM.guild, executor.id, "تعديل رتب بدون إذن");
-
+    await punishMember(guild, executor.id, "تعديل رتب بدون إذن");
+    await logAction(guild, `🚫 محاولة غير شرعية لتعديل رتب`);
   } catch {}
 });
 
-// حماية الباند
-client.on("guildBanAdd", async ban => {
+// Protect Unauthorized Ban
+client.on("guildBanAdd", async (ban) => {
   try {
-    if (!ensureProtection(ban.guild.id)) return;
+    const guild = ban.guild;
+    if (!ensureProtection(guild.id)) return;
 
-    const logs = await ban.guild.fetchAuditLogs({
+    const logs = await guild.fetchAuditLogs({
       limit: 1,
       type: AuditLogEvent.MemberBanAdd
     });
-
     const entry = logs.entries.first();
     if (!entry) return;
 
     const executor = entry.executor;
     if (isWhitelisted(executor.id)) return;
 
-    await ban.guild.members.unban(ban.user).catch(()=>{});
-    await punishMember(ban.guild, executor.id, "إعطاء باند بدون إذن");
+    await guild.members.unban(ban.user).catch(()=>{});
+    await punishMember(guild, executor.id, "إعطاء باند بدون إذن");
+    await logAction(guild, `🚫 تم منع باند غير شرعي`);
   } catch {}
 });
 
-// حماية إضافة البوتات
-client.on("guildMemberAdd", async member => {
-  try {
-    if (!member.user.bot) return;
-    if (!ensureProtection(member.guild.id)) return;
+// Protect Unauthorized Bot Add
+client.on("guildMemberAdd", async (member) => {
+  if (!member.user.bot) return;
 
-    const logs = await member.guild.fetchAuditLogs({
-      limit: 1,
-      type: AuditLogEvent.BotAdd
-    });
+  const guild = member.guild;
+  if (!ensureProtection(guild.id)) return;
 
-    const entry = logs.entries.first();
-    if (!entry) return;
+  const logs = await guild.fetchAuditLogs({
+    limit: 1,
+    type: AuditLogEvent.BotAdd
+  });
+  const entry = logs.entries.first();
+  if (!entry) return;
 
-    const executor = entry.executor;
-    if (isWhitelisted(executor.id)) return;
+  const executor = entry.executor;
+  if (isWhitelisted(executor.id)) return;
 
-    await member.kick("إضافة بوت بدون إذن").catch(()=>{});
-    await punishMember(member.guild, executor.id, "إضافة بوت بدون إذن");
-  } catch {}
+  await member.kick("إضافة بوت بدون إذن").catch(()=>{});
+  await punishMember(guild, executor.id, "إضافة بوت بدون إذن");
+  await logAction(guild, `🚫 محاولة إضافة بوت بدون إذن`);
 });
 
 client.login(TOKEN);
